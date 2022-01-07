@@ -5,8 +5,6 @@ import numpy as np
 import pickle
 import datetime
 
-import src.data.euroc_mav.loading as euroc
-
 matplotlib.use('TKAgg')
 
 FRAME_NUM = 0
@@ -22,6 +20,8 @@ def label_data(video_path: str, label_path: str):
     :return:
     """
     global FRAME_NUM
+
+    # Loading video in RAM
     video = cv2.VideoCapture(video_path)
     img = []
     is_reading, frame = video.read()
@@ -31,6 +31,7 @@ def label_data(video_path: str, label_path: str):
     img = np.stack(img[:-1])
     _, height, width, _ = img.shape
 
+    # Loading label
     try:
         msg = f'Previous label found at: {label_path}'
         label = pickle.load(open(f'{label_path}', 'rb'))
@@ -39,9 +40,9 @@ def label_data(video_path: str, label_path: str):
         label = {}
     print(msg)
 
+    # Creating a window with the first frame
     FRAME_NUM = 0
-    # fig, ax = plt.subplots(1, 1, figsize=(2.5 * 6.4, 2 * 4.8))
-    fig, ax = plt.subplots(1, 1, figsize=(2 * 6.4, 1.5 * 4.8))
+    fig, ax = plt.subplots(1, 1, figsize=(2.5 * 6.4, 2 * 4.8))
     ax.set_title(f'Frame: {FRAME_NUM}')
     img_obj = ax.imshow(img[FRAME_NUM])
     scatter_obj = ax.scatter(width / 2, height / 2, c='r', alpha=0)
@@ -51,6 +52,7 @@ def label_data(video_path: str, label_path: str):
         scatter_obj.set_offsets(value[0])
         scatter_obj.set_color('g' if value[1] else 'r')
 
+    # Display the frame FRAME_NUM + increment on the already open window
     def display_other_frame(increment):
         global FRAME_NUM
         global INVERT
@@ -81,6 +83,7 @@ def label_data(video_path: str, label_path: str):
     #         label[FRAME_NUM] = np.array([np.round(event.xdata), np.round(event.ydata)])
     #         display_other_frame(1)
 
+    # Mapping the keyboard keys
     def on_key(event):
         global INVERT
         if event.key == 'e':
@@ -118,9 +121,7 @@ def label_data(video_path: str, label_path: str):
 
 
 def main():
-    flight = euroc.FLIGHT_LIST[0]
-    vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
-    label_data(video_path=f'{vice_path}/raw.mkv', label_path=f'{vice_path}label.pkl')
+    label_data(video_path=f'path_to_my_video.mkv', label_path=f'path_to_my_label.pkl')
 
 
 if __name__ == '__main__':
