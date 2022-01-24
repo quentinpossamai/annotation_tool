@@ -22,3 +22,6 @@ Navigation does not change the points:
 Other:
 - r: Invert the color of the image.
 - w: Save the current mapping. You can still continue to map.
+
+
+Red Lines Tools for macOS can be used to obtain a more precise labelling.
