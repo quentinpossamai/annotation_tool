@@ -9,9 +9,10 @@ matplotlib.use('TKAgg')
 
 FRAME_NUM = 0
 INVERT = False
+POINT_NUMBER = 1  # 0, 1, 2, 3
 
 
-def label_data(video_path: str, label_path: str):
+def label_data(video_path: str, labels_path: str):
     """
     Label the frame of a video file with using matplotlib and cursor position.
 
@@ -20,39 +21,41 @@ def label_data(video_path: str, label_path: str):
     :return:
     """
     global FRAME_NUM
-
-    # Loading video in RAM
     video = cv2.VideoCapture(video_path)
     img = []
     is_reading, frame = video.read()
+    height, width, _, = frame.shape
     while is_reading:
-        img.append(frame[:, :, ::-1])
+        # read video is in bgr.
+        img.append(np.array(frame[:, :, ::-1]))
         is_reading, frame = video.read()
-    img = np.stack(img[:-1])
+    img = np.stack(img)
     _, height, width, _ = img.shape
-
-    # Loading label
     try:
-        msg = f'Previous label found at: {label_path}'
-        label = pickle.load(open(f'{label_path}', 'rb'))
+        msg = f'Previous labels found at: {labels_path}'
+        labels = pickle.load(open(f'{labels_path}', 'rb'))
     except FileNotFoundError:
         msg = f'No previous label found.'
-        label = {}
+        labels = {0: {}, 1: {}, 2: {}, 3: {}}
     print(msg)
 
-    # Creating a window with the first frame
     FRAME_NUM = 0
-    fig, ax = plt.subplots(1, 1, figsize=(2.5 * 6.4, 2 * 4.8))
+    # fig, ax = plt.subplots(1, 1, figsize=(2.5 * 6.4, 2 * 4.8))
+    fig, ax = plt.subplots(1, 1, figsize=(1.2 * width / 100, 1.2 * height / 100))
     ax.set_title(f'Frame: {FRAME_NUM}')
     img_obj = ax.imshow(img[FRAME_NUM])
-    scatter_obj = ax.scatter(width / 2, height / 2, c='r', alpha=0)
-    if 0 in label:
-        scatter_obj.set_alpha(1)
-        value = label[0]
-        scatter_obj.set_offsets(value[0])
-        scatter_obj.set_color('g' if value[1] else 'r')
+    ax.grid(False)
+    scatter_obj = {0: ax.scatter(width / 2, height / 2, c='r', alpha=0),
+                   1: ax.scatter(width / 2, height / 2, c='r', alpha=0),
+                   2: ax.scatter(width / 2, height / 2, c='r', alpha=0),
+                   3: ax.scatter(width / 2, height / 2, c='r', alpha=0)}
+    for i in range(4):
+        if 0 in labels[i]:
+            scatter_obj[i].set_alpha(1)
+            value = labels[i][0]
+            scatter_obj[i].set_offsets(value[0])
+            scatter_obj[i].set_color('g' if value[1] else 'r')
 
-    # Display the frame FRAME_NUM + increment on the already open window
     def display_other_frame(increment):
         global FRAME_NUM
         global INVERT
@@ -61,20 +64,19 @@ def label_data(video_path: str, label_path: str):
             img_obj.set_data(255 - img[FRAME_NUM])
         else:
             img_obj.set_data(img[FRAME_NUM])
-        if FRAME_NUM in label:
-            val = label[FRAME_NUM]
-            scatter_obj.set_alpha(1)
-            if val[1]:  # keyframe
-                ax.set_title(f'Frame: {FRAME_NUM} | Keyframe')
-                scatter_obj.set_offsets(label[FRAME_NUM][0])
-                scatter_obj.set_color('g')
+        for i_ind in range(4):
+            if FRAME_NUM in labels[i_ind]:
+                val = labels[i_ind][FRAME_NUM]
+                scatter_obj[i_ind].set_alpha(1)
+                if val[1]:  # keyframe
+                    scatter_obj[i_ind].set_offsets(labels[i_ind][FRAME_NUM][0])
+                    scatter_obj[i_ind].set_color('g')
+                else:
+                    scatter_obj[i_ind].set_color('r')
+                    scatter_obj[i_ind].set_offsets(labels[i_ind][FRAME_NUM][0])
             else:
-                ax.set_title(f'Frame: {FRAME_NUM} | Normal frame ')
-                scatter_obj.set_color('r')
-                scatter_obj.set_offsets(label[FRAME_NUM][0])
-        else:
-            ax.set_title(f'Frame: {FRAME_NUM}')
-            scatter_obj.set_alpha(0)
+                scatter_obj[i_ind].set_alpha(0)
+        ax.set_title(f'Frame: {FRAME_NUM}')
         fig.canvas.draw()
 
     # If the labelling is done with the click.
@@ -83,14 +85,13 @@ def label_data(video_path: str, label_path: str):
     #         label[FRAME_NUM] = np.array([np.round(event.xdata), np.round(event.ydata)])
     #         display_other_frame(1)
 
-    # Mapping the keyboard keys
     def on_key(event):
         global INVERT
         if event.key == 'e':
-            label[FRAME_NUM] = (np.array([np.round(event.xdata), np.round(event.ydata)]), False)  # not a key frame
+            labels[POINT_NUMBER][FRAME_NUM] = (np.array([np.round(event.xdata), np.round(event.ydata)]), False)  # not a key frame
             display_other_frame(1)
         if event.key == ' ':
-            label[FRAME_NUM] = (np.array([np.round(event.xdata), np.round(event.ydata)]), True)  # a key frame
+            labels[POINT_NUMBER][FRAME_NUM] = (np.array([np.round(event.xdata), np.round(event.ydata)]), True)  # a key frame
             display_other_frame(1)
         if event.key == '1':
             display_other_frame(-1)
@@ -108,12 +109,12 @@ def label_data(video_path: str, label_path: str):
             INVERT = not INVERT
             display_other_frame(0)
         if event.key == 'd':
-            del label[FRAME_NUM]
+            del labels[POINT_NUMBER][FRAME_NUM]
             display_other_frame(0)
         if event.key == 'w':
             h = datetime.datetime.now()
-            print(f'{h.ctime()}: Saving at: {label_path}')
-            pickle.dump(label, open(f'{label_path}', 'wb'))
+            print(f'{h.ctime()}: Saving at: {labels_path}')
+            pickle.dump(labels, open(f'{labels_path}', 'wb'))
 
     # fig.canvas.mpl_connect('button_press_event', on_click)
     fig.canvas.mpl_connect('key_press_event', on_key)
@@ -121,8 +122,7 @@ def label_data(video_path: str, label_path: str):
 
 
 def main():
-    label_data(video_path=f'path_to_my_video.mkv', label_path=f'path_to_my_label.pkl')
-
-
+    label_data(video_path=f'path_to_video.mkv', labels_path=path_to_labels.pkl)
+    
 if __name__ == '__main__':
     main()
